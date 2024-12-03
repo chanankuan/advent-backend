@@ -25,7 +25,13 @@ def close_db(e=None):
 def init_db():
     db = get_db()
 
-    with current_app.open_resource('schema.sql') as f:
+    with current_app.open_resource('./queries/schema.sql') as f:
+        db.executescript(f.read().decode('utf8'))
+
+def populate_db():
+    db = get_db()
+
+    with current_app.open_resource('./queries/populate.sql') as f:
         db.executescript(f.read().decode('utf8'))
 
 @click.command('init-db')
@@ -33,6 +39,12 @@ def init_db_command():
     """Clear the existing data and create new tables."""
     init_db()
     click.echo('Initialized the database.')
+
+@click.command('populate-db')
+def populate_db_command():
+    """Populate the databse with mockup data."""
+    populate_db()
+    click.echo('Populated the database.')
 
 
 sqlite3.register_converter(
@@ -42,5 +54,6 @@ sqlite3.register_converter(
 def init_app(app):
     app.teardown_appcontext(close_db)
     app.cli.add_command(init_db_command)
+    app.cli.add_command(populate_db_command)
 
         
