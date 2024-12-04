@@ -6,71 +6,91 @@ from flask import (
 from flaskr.db import get_db
 from .auth import login_required
 
-bp = Blueprint('calendar', __name__, url_prefix='/calendar')
+bp = Blueprint('calendar', __name__, url_prefix='/calendars')
 
 """ Create a calendar """
-@bp.route('/', methods=['POST'])
+@bp.route('/', methods=['GET', 'POST'])
 @login_required
-def createCalendar():
-	user_id = session.get('user_id')
-	print(user_id)
+def calendars():
+	# Get user's calendars
+	if request.method == 'GET':
+		user_id = session.get('user_id')
+		db = get_db()
 
-	data = request.get_json()
-	title = data.get('title')
-	notes = data.get('notes')
+		# Find calendars
+		calendars = db.execute("""
+			SELECT id, title, access_token
+			FROM calendars
+			WHERE author_id = ?
+		""", (user_id,)).fetchall()
 
-	if not title:
-		return 'Title is requred.', 400
+		# Calendars are now dictionaries thanks to the row_factory
+		calendars_list = [dict(row) for row in calendars]
+
+		return calendars_list
 	
-	if not notes or len(notes) != 24:
-		return 'There should be 24 notes.', 400
+	# Create a new calendar
+	else:
+		user_id = session.get('user_id')
+		print(user_id)
 
-	db = get_db()
+		data = request.get_json()
+		title = data.get('title')
+		notes = data.get('notes')
 
-	# Generate a unique ID
-	unique_id = str(uuid.uuid4())
-
-	# Insert a new calendar into db
-	db.execute("""
-		INSERT INTO calendars (author_id, title, access_token)
-		VALUES (?, ?, ?)
-	""", (user_id, title, unique_id,))
-
-	# Commit the changes to persist in the database
-	db.commit()
-
-	# Retrieve the created calendar
-	calendar = db.execute("SELECT id, title, access_token FROM calendars WHERE access_token = ?", (unique_id,)).fetchone()
-
-	# Insert 24 notes into db
-	for note in notes:
-		db.execute("""
-			INSERT INTO notes (author_id, calendar_id, description, day)
-			VALUES (?, ?, ?, ?)
-		""", (user_id, calendar['id'], note['description'], note['day'],))
+		if not title:
+			return 'Title is requred.', 400
 		
+		if not notes or len(notes) != 24:
+			return 'There should be 24 notes.', 400
+
+		db = get_db()
+
+		# Generate a unique ID
+		unique_id = str(uuid.uuid4())
+
+		# Insert a new calendar into db
+		db.execute("""
+			INSERT INTO calendars (author_id, title, access_token)
+			VALUES (?, ?, ?)
+		""", (user_id, title, unique_id,))
+
 		# Commit the changes to persist in the database
 		db.commit()
+
+		# Retrieve the created calendar
+		calendar = db.execute("SELECT id, title, access_token FROM calendars WHERE access_token = ?", (unique_id,)).fetchone()
+
+		# Insert 24 notes into db
+		for note in notes:
+			db.execute("""
+				INSERT INTO notes (author_id, calendar_id, description, day)
+				VALUES (?, ?, ?, ?)
+			""", (user_id, calendar['id'], note['description'], note['day'],))
+			
+			# Commit the changes to persist in the database
+			db.commit()
+		
+		# Find notes related to the calendar
+		notes = db.execute("""
+			SELECT
+				day,
+				description,
+				opened_at
+			FROM notes
+			WHERE calendar_id = ?
+		""", (calendar['id'],))
+
+		notes_dict = [dict(note) for note in notes]
+
+		# Convert Row object to dictionary
+		calendar_dict = dict(calendar)
+
+		# Add notes to the calendar dictionary
+		calendar_dict['notes'] = notes_dict
+
+		return jsonify(calendar_dict), 201
 	
-	# Find notes related to the calendar
-	notes = db.execute("""
-		SELECT
-			day,
-			description,
-			opened_at
-		FROM notes
-		WHERE calendar_id = ?
-	""", (calendar['id'],))
-
-	notes_dict = [dict(note) for note in notes]
-
-	# Convert Row object to dictionary
-	calendar_dict = dict(calendar)
-
-	# Add notes to the calendar dictionary
-	calendar_dict['notes'] = notes_dict
-
-	return jsonify(calendar_dict), 201
 	
 
 """ Get calendar data """
