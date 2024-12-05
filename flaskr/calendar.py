@@ -10,9 +10,8 @@ from .auth import login_required
 bp = Blueprint('calendar', __name__, url_prefix='/calendars')
 
 """ Create a calendar """
-@bp.route('/', methods=['GET', 'POST'])
+@bp.route('', methods=['GET', 'POST'])
 @login_required
-@cross_origin(supports_credentials=True)
 def calendars():
 	# Get user's calendars
 	if request.method == 'GET':
