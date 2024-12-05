@@ -6,6 +6,8 @@ from datetime import timedelta
 from flask import Flask, session
 from flask_cors import CORS
 
+from . import calendars
+
 
 def create_app(test_config=None):
     # Load environment variables from the .env file
@@ -49,9 +51,9 @@ def create_app(test_config=None):
     from . import db
     db.init_app(app)
 
-    from . import auth, calendar
+    from . import auth
     app.register_blueprint(auth.bp)
-    app.register_blueprint(calendar.bp)
+    app.register_blueprint(calendars.bp)
 
     return app
 
